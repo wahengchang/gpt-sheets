@@ -20,6 +20,13 @@ var OpenAIClient = (function() {
       max_tokens: request.max_tokens
     };
 
+    if (request.tool) {
+      var toolPayload = buildToolPayload(request.tool);
+      if (toolPayload) {
+        payload.tools = [toolPayload];
+      }
+    }
+
     var options = {
       method: 'post',
       muteHttpExceptions: true,
@@ -80,6 +87,24 @@ var OpenAIClient = (function() {
     }
 
     throw new Error('#GPT_INTERNAL Unknown failure contacting OpenAI.');
+  }
+
+  function buildToolPayload(tool) {
+    if (!tool || !tool.name) {
+      return null;
+    }
+
+    var name = String(tool.name).trim().toLowerCase();
+    if (name !== 'web_search') {
+      return null;
+    }
+
+    var entry = { type: 'web_search' };
+    var params = tool.parameters || {};
+    if (params && typeof params === 'object' && Object.keys(params).length) {
+      entry.web_search = params;
+    }
+    return entry;
   }
 
   return {
