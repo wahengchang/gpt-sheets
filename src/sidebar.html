@@ -3,26 +3,275 @@
   <head>
     <base target="_top" />
     <style>
+      :root {
+        color-scheme: light;
+      }
       body {
-        font-family: Arial, sans-serif;
+        font-family: "Google Sans", "Roboto", Arial, sans-serif;
+        font-size: 13px;
+        color: #202124;
         padding: 16px;
+        line-height: 1.5;
       }
       h1 {
         font-size: 18px;
-        margin-bottom: 8px;
+        margin: 0 0 12px;
       }
-      code {
-        background: #f4f4f4;
-        padding: 2px 4px;
-        border-radius: 3px;
+      label {
+        display: block;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      input,
+      select {
+        width: 100%;
+        padding: 8px;
+        border: 1px solid #dadce0;
+        border-radius: 4px;
+        box-sizing: border-box;
+        font-size: 13px;
+      }
+      input:focus,
+      select:focus {
+        outline: none;
+        border-color: #4285f4;
+        box-shadow: 0 0 0 1px #4285f4;
+      }
+      .field {
+        margin-bottom: 14px;
+      }
+      .hint {
+        color: #5f6368;
+        font-size: 12px;
+        margin-top: 4px;
+      }
+      .status {
+        margin-top: 12px;
+        padding: 10px;
+        border-radius: 4px;
+        display: none;
+      }
+      .status.success {
+        background: #e6f4ea;
+        color: #0b8043;
+        display: block;
+      }
+      .status.error {
+        background: #fce8e6;
+        color: #c5221f;
+        display: block;
+      }
+      .actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 16px;
+      }
+      button {
+        border: none;
+        padding: 10px 14px;
+        border-radius: 4px;
+        font-size: 13px;
+        cursor: pointer;
+      }
+      button.primary {
+        background: #1a73e8;
+        color: #fff;
+      }
+      button.secondary {
+        background: #f1f3f4;
+        color: #202124;
+      }
+      button.danger {
+        background: transparent;
+        color: #c5221f;
+        padding-left: 0;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
       }
     </style>
   </head>
   <body>
-    <h1>GPT for Sheets Setup</h1>
-    <p>1. Open <strong>Extensions → Apps Script → Project Settings</strong>.</p>
-    <p>2. Add a Script property named <code>OPENAI_API_KEY</code> with your OpenAI key.</p>
-    <p>3. Return to Sheets and try <code>=GPT("Explain A1")</code>.</p>
-    <p>This sidebar is a placeholder to validate template rendering.</p>
+    <h1>GPT for Sheets Settings</h1>
+    <div class="field">
+      <label for="apiKey">OpenAI API Key</label>
+      <input
+        type="password"
+        id="apiKey"
+        name="apiKey"
+        autocomplete="off"
+        placeholder="sk-..."
+      />
+      <div id="apiKeyHint" class="hint"></div>
+      <button type="button" class="danger" id="clearKeyButton" style="display:none;">Remove saved key</button>
+    </div>
+
+    <div class="field">
+      <label for="model">Model</label>
+      <input type="text" id="model" name="model" placeholder="gpt-4.1-mini" />
+      <div class="hint">Choose any chat-capable OpenAI model available to your account.</div>
+    </div>
+
+    <div class="field">
+      <label for="temperature">Temperature</label>
+      <input
+        type="number"
+        id="temperature"
+        name="temperature"
+        step="0.1"
+        min="0"
+        max="2"
+      />
+      <div class="hint">Higher values (e.g. 1.0) increase creativity; lower values (e.g. 0.2) make responses more focused.</div>
+    </div>
+
+    <div class="field">
+      <label for="maxTokens">Max tokens</label>
+      <input type="number" id="maxTokens" name="maxTokens" min="1" max="32768" />
+      <div class="hint">Controls response length. Stay within your model's maximum context window.</div>
+    </div>
+
+    <div class="actions">
+      <button type="button" class="primary" id="saveButton">Save</button>
+      <button type="button" class="secondary" id="testButton">Test connection</button>
+    </div>
+
+    <div id="status" class="status"></div>
+
+    <script>
+      var settingsState = {
+        hasApiKey: false,
+        apiKeyMasked: '',
+        defaults: {}
+      };
+
+      document.getElementById('saveButton').addEventListener('click', handleSave);
+      document.getElementById('testButton').addEventListener('click', handleTest);
+      document.getElementById('clearKeyButton').addEventListener('click', handleClearKey);
+
+      document.addEventListener('DOMContentLoaded', function() {
+        google.script.run
+          .withSuccessHandler(renderSettings)
+          .withFailureHandler(function(error) {
+            showStatus(error && error.message ? error.message : 'Failed to load settings.', true);
+          })
+          .getSettings();
+      });
+
+      function renderSettings(data) {
+        settingsState = data;
+        settingsState.clearKeyRequested = false;
+        var modelInput = document.getElementById('model');
+        var temperatureInput = document.getElementById('temperature');
+        var maxTokensInput = document.getElementById('maxTokens');
+        var apiKeyHint = document.getElementById('apiKeyHint');
+        var clearKeyButton = document.getElementById('clearKeyButton');
+
+        modelInput.value = data.model || data.defaults.model;
+        temperatureInput.value = data.temperature || data.defaults.temperature;
+        maxTokensInput.value = data.maxTokens || data.defaults.maxTokens;
+
+        if (data.hasApiKey) {
+          apiKeyHint.textContent = 'API key saved: ' + data.apiKeyMasked + '. Leave blank to keep it.';
+          clearKeyButton.style.display = 'inline';
+        } else {
+          apiKeyHint.textContent = 'Paste your OpenAI key (sk-...). Stored securely for your account only.';
+          clearKeyButton.style.display = 'none';
+        }
+      }
+
+      function handleSave() {
+        toggleButtons(true);
+        showStatus('');
+
+        var apiKeyField = document.getElementById('apiKey');
+        var payload = {
+          apiKey: apiKeyField.value.trim(),
+          model: document.getElementById('model').value.trim(),
+          temperature: document.getElementById('temperature').value,
+          maxTokens: document.getElementById('maxTokens').value,
+          retainExistingKey: settingsState.hasApiKey && !apiKeyField.value && !settingsState.clearKeyRequested
+        };
+
+        if (settingsState.clearKeyRequested) {
+          payload.apiKey = '';
+          payload.retainExistingKey = false;
+        }
+
+        google.script.run
+          .withSuccessHandler(function(response) {
+            showStatus(response && response.message ? response.message : 'Settings saved.', false);
+            apiKeyField.value = '';
+            settingsState.clearKeyRequested = false;
+            refreshSettings();
+            toggleButtons(false);
+          })
+          .withFailureHandler(function(error) {
+            showStatus(error && error.message ? error.message : 'Unable to save settings.', true);
+            toggleButtons(false);
+          })
+          .saveSettings(payload);
+      }
+
+      function handleTest() {
+        toggleButtons(true);
+        showStatus('Testing connection...');
+
+        var apiKeyField = document.getElementById('apiKey');
+        var candidateKey = apiKeyField.value.trim();
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            if (result && typeof result.success === 'boolean') {
+              showStatus(result.message, !result.success);
+            } else {
+              showStatus('Test completed.', false);
+            }
+            toggleButtons(false);
+          })
+          .withFailureHandler(function(error) {
+            showStatus(error && error.message ? error.message : 'Unable to test connection.', true);
+            toggleButtons(false);
+          })
+          .testConnection({ apiKey: candidateKey });
+      }
+
+      function handleClearKey() {
+        settingsState.clearKeyRequested = true;
+        document.getElementById('apiKey').value = '';
+        showStatus('API key will be removed once you save.', false);
+      }
+
+      function refreshSettings() {
+        google.script.run
+          .withSuccessHandler(renderSettings)
+          .withFailureHandler(function(error) {
+            showStatus(error && error.message ? error.message : 'Failed to refresh settings.', true);
+          })
+          .getSettings();
+      }
+
+      function showStatus(message, isError) {
+        var statusBox = document.getElementById('status');
+        if (!message) {
+          statusBox.style.display = 'none';
+          statusBox.textContent = '';
+          statusBox.classList.remove('success', 'error');
+          return;
+        }
+        statusBox.textContent = message;
+        statusBox.style.display = 'block';
+        statusBox.classList.toggle('error', Boolean(isError));
+        statusBox.classList.toggle('success', !isError);
+      }
+
+      function toggleButtons(disabled) {
+        document.getElementById('saveButton').disabled = disabled;
+        document.getElementById('testButton').disabled = disabled;
+        var clearButton = document.getElementById('clearKeyButton');
+        clearButton.disabled = disabled;
+      }
+    </script>
   </body>
 </html>

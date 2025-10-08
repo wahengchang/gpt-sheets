@@ -19,9 +19,8 @@ function onInstall() {
 function buildMenu() {
   var ui = SpreadsheetApp.getUi();
   ui.createMenu('GPT for Sheets')
+    .addItem('Open Settings', 'openSettingsSidebar')
     .addItem('Insert "=GPT(\\"Explain A1\\")"', 'insertExampleFormula')
-    .addSeparator()
-    .addItem('Configuration help', 'showSetupSidebar')
     .addToUi();
 }
 
@@ -32,10 +31,4 @@ function insertExampleFormula() {
     return;
   }
   activeRange.setValue('=GPT("Explain A1")');
-}
-
-function showSetupSidebar() {
-  var html = HtmlService.createHtmlOutputFromFile('sidebar')
-    .setTitle('GPT for Sheets Setup');
-  SpreadsheetApp.getUi().showSidebar(html);
 }

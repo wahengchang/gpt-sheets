@@ -14,7 +14,7 @@ function fetchCompletion(prompt) {
   }
 
   if (!hasApiKey()) {
-    return '⚠️ Set OPENAI_API_KEY in Script Properties before using GPT().';
+    return '⚠️ Add your OpenAI API key via GPT for Sheets → Open Settings.';
   }
 
   // Real implementation will call UrlFetchApp; for now just echo the prompt.
