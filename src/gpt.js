@@ -4,28 +4,28 @@
 
 /**
  * @customfunction
- * Placeholder implementation that will call the GPT backend.
- *
- * @param {any} input The cell value or range to process.
- * @param {string} [instruction] Optional modifier for the prompt.
- * @returns {string} Temporary response for wiring verification.
  */
-function GPT(input, instruction) {
-  var prompt = buildPrompt(input, instruction);
-  var result = fetchCompletion(prompt);
-  return result;
+function GPT(text, system_message, model, max_tokens, temperature, tool) {
+  return Core.generate('text', arguments);
 }
 
 /**
  * @customfunction
- * Example stub for a JSON-returning variant.
- *
- * @param {any} input The cell value or range to process.
- * @param {string} [instruction] Optional modifier for the prompt.
- * @returns {string} JSON string placeholder.
  */
-function GPTJSON(input, instruction) {
-  var prompt = buildPrompt(input, instruction);
-  var result = fetchCompletion(prompt);
-  return JSON.stringify({ data: result });
+function GPT_LIST(text, system_message, model, max_tokens, temperature, tool) {
+  return Core.generate('list', arguments);
+}
+
+/**
+ * @customfunction
+ */
+function GPT_RECORD(text, schema, system_message, model, max_tokens, temperature, tool) {
+  return Core.generate('record', arguments);
+}
+
+/**
+ * @customfunction
+ */
+function GPT_RECORD_LIST(text, schema, system_message, model, max_tokens, temperature, tool) {
+  return Core.generate('record_list', arguments);
 }
