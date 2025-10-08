@@ -54,18 +54,28 @@ var PostProcessor = (function() {
 
   function wrapRecord(record, schema, cfg) {
     if (!record) {
-      return [['(no data)']];
+      return [['']];
     }
 
-    var rows = [];
+    var row = [];
     var fields = (schema && schema.fields) || [];
+    if (!fields.length) {
+      var keys = Object.keys(record);
+      for (var k = 0; k < keys.length; k++) {
+        var key = keys[k];
+        var value = record[key];
+        row.push(String(value === undefined || value === null ? '' : value));
+      }
+      return row.length ? [row] : [['']];
+    }
+
     for (var i = 0; i < fields.length; i++) {
       var field = fields[i];
       var coerced = coerceField(record[field.key], field.type);
-      rows.push([field.key + ': ' + formatCoercedValue(coerced, field.type)]);
+      row.push(formatCoercedValue(coerced, field.type));
     }
 
-    return rows.length ? rows : [['(no data)']];
+    return row.length ? [row] : [['']];
   }
 
   function wrapRecordList(records, schema, targetCount, cfg) {
