@@ -62,7 +62,7 @@ var PostProcessor = (function() {
     for (var i = 0; i < fields.length; i++) {
       var field = fields[i];
       var coerced = coerceField(record[field.key], field.type);
-      rows.push([field.key + ': ' + formatCoercedValue(coerced, field.type)]);
+      rows.push([formatCoercedValue(coerced, field.type)]);
     }
 
     return rows.length ? rows : [['(no data)']];
