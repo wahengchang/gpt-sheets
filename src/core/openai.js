@@ -20,6 +20,14 @@ var OpenAIClient = (function() {
       max_tokens: request.max_tokens
     };
 
+    var toolPayload = null;
+    if (request.tool) {
+      toolPayload = buildToolPayload(request.tool);
+      if (toolPayload) {
+        payload.tools = [toolPayload];
+      }
+    }
+
     var options = {
       method: 'post',
       muteHttpExceptions: true,
@@ -66,6 +74,13 @@ var OpenAIClient = (function() {
         }
         throw new Error('#GPT_INTERNAL ' + message);
       } catch (err) {
+        if (toolPayload && isWebSearchUnsupportedError(err)) {
+          debugLog('OpenAI rejected web_search tool, retrying without tool.');
+          toolPayload = null;
+          delete payload.tools;
+          options.payload = JSON.stringify(payload);
+          continue;
+        }
         lastError = err;
         if (attempt >= RETRY_COUNT) {
           throw err;
@@ -80,6 +95,41 @@ var OpenAIClient = (function() {
     }
 
     throw new Error('#GPT_INTERNAL Unknown failure contacting OpenAI.');
+  }
+
+  function buildToolPayload(tool) {
+    if (!tool || !tool.name) {
+      return null;
+    }
+
+    var name = String(tool.name).trim().toLowerCase();
+    if (name !== 'web_search') {
+      return null;
+    }
+
+    var entry = { type: 'web_search' };
+    var params = tool.parameters || {};
+    if (params && typeof params === 'object' && Object.keys(params).length) {
+      entry.web_search = params;
+    }
+    return entry;
+  }
+
+  function isWebSearchUnsupportedError(err) {
+    if (!err || !err.message) {
+      return false;
+    }
+
+    var message = String(err.message);
+    if (message.indexOf('web_search') === -1) {
+      return false;
+    }
+
+    return (
+      message.indexOf('Invalid value') !== -1 ||
+      message.indexOf('Supported values are:') !== -1 ||
+      message.indexOf('not enabled') !== -1
+    );
   }
 
   return {
