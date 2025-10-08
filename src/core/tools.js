@@ -3,42 +3,207 @@
  */
 
 var ToolRunner = (function() {
-  function run(toolName, text, context) {
-    if (!toolName) {
-      return { contextText: '', diagnostics: {} };
+  function run(toolConfig, text, context) {
+    if (!toolConfig) {
+      return buildEmptyResult();
     }
 
-    if (toolName !== 'web_search') {
-      throw new Error('#GPT_TOOL_UNKNOWN Unsupported tool: ' + toolName);
+    var name = normalizeToolName(toolConfig);
+    if (name !== 'web_search') {
+      throw new Error('#GPT_TOOL_UNKNOWN Unsupported tool: ' + name);
     }
 
     try {
-      var result = runWebSearchTool(text, context);
-      return result;
+      return prepareWebSearchTool(toolConfig, text, context);
     } catch (err) {
       debugLog('Tool failed, falling back without context:', err && err.message);
       return {
-        contextText: '',
+        contextText: buildFallbackContext(text),
         diagnostics: {
-          tool_error: err && err.message
-        }
+          tool_error: err && err.message,
+          tool_used: 'web_search',
+          tool_mode: 'stub'
+        },
+        toolSpec: null
       };
     }
   }
 
-  function runWebSearchTool(text, context) {
-    // Stub implementation: in v1 we simply return a placeholder context so the
-    // prompt builder can include a deterministic hint without making external calls.
-    var sanitizedPrompt = (text || '').slice(0, 300);
+  function prepareWebSearchTool(toolConfig, text, context) {
+    var sanitized = sanitizeWebSearchParameters(toolConfig && toolConfig.parameters, text);
+    var queryForContext = sanitized.search_query || '';
+
     return {
-      contextText:
-        'Web search context is not yet available. Use your general knowledge to answer the prompt: ' +
-        sanitizedPrompt,
+      contextText: buildWebSearchContext(text, queryForContext),
       diagnostics: {
         tool_used: 'web_search',
-        tool_mode: 'stub'
+        tool_mode: 'openai',
+        tool_query: queryForContext
+      },
+      toolSpec: {
+        name: 'web_search',
+        parameters: sanitized
       }
     };
+  }
+
+  function sanitizeWebSearchParameters(rawParameters, promptText) {
+    var params = clonePlainObject(rawParameters);
+    var normalized = {};
+
+    var queryCandidate = firstDefined(params.search_query, params.query, params.q);
+    var sanitizedQuery = sanitizeSearchQuery(queryCandidate !== undefined ? queryCandidate : promptText);
+    if (!sanitizedQuery) {
+      sanitizedQuery = sanitizeSearchQuery(promptText);
+    }
+    if (sanitizedQuery) {
+      normalized.search_query = sanitizedQuery;
+    }
+
+    if (Object.prototype.hasOwnProperty.call(params, 'max_results')) {
+      var parsedMax = parseInt(params.max_results, 10);
+      if (!isNaN(parsedMax)) {
+        normalized.max_results = clamp(parsedMax, 1, 25);
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(params, 'recency_filter')) {
+      var recency = sanitizeString(params.recency_filter, 32);
+      if (recency) {
+        normalized.recency_filter = recency;
+      }
+    }
+
+    if (Object.prototype.hasOwnProperty.call(params, 'include_images')) {
+      normalized.include_images = Boolean(params.include_images);
+    }
+
+    // Copy any remaining primitive parameters that we haven't handled explicitly.
+    for (var key in params) {
+      if (!Object.prototype.hasOwnProperty.call(params, key)) {
+        continue;
+      }
+      if (
+        key === 'search_query' ||
+        key === 'query' ||
+        key === 'q' ||
+        key === 'max_results' ||
+        key === 'recency_filter' ||
+        key === 'include_images'
+      ) {
+        continue;
+      }
+      var value = params[key];
+      if (value === undefined) {
+        continue;
+      }
+      if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        normalized[key] = value;
+      }
+    }
+
+    return normalized;
+  }
+
+  function buildWebSearchContext(promptText, query) {
+    var sanitizedPrompt = sanitizeString(promptText, 300);
+    var sanitizedQuery = sanitizeString(query, 200);
+    if (!sanitizedPrompt && sanitizedQuery) {
+      sanitizedPrompt = sanitizedQuery;
+    }
+    return (
+      'A live web search has been requested for real-time data. Query: "' +
+      sanitizedQuery +
+      '". If the web search tool is unavailable, rely on your general knowledge to answer the prompt: ' +
+      sanitizedPrompt
+    );
+  }
+
+  function buildFallbackContext(promptText) {
+    return (
+      'Web search context could not be retrieved. Use your general knowledge to answer the prompt: ' +
+      sanitizeString(promptText, 300)
+    );
+  }
+
+  function buildEmptyResult() {
+    return { contextText: '', diagnostics: {}, toolSpec: null };
+  }
+
+  function normalizeToolName(toolConfig) {
+    if (!toolConfig) {
+      return '';
+    }
+    if (typeof toolConfig === 'string') {
+      return toolConfig.trim().toLowerCase();
+    }
+    if (typeof toolConfig === 'object' && toolConfig.name) {
+      return String(toolConfig.name).trim().toLowerCase();
+    }
+    throw new Error('#GPT_TOOL_BAD_SPEC Unable to determine tool name.');
+  }
+
+  function sanitizeSearchQuery(value) {
+    var str = value === undefined || value === null ? '' : String(value);
+    var collapsed = str.replace(/\s+/g, ' ').trim();
+    if (!collapsed) {
+      return '';
+    }
+    if (collapsed.length > 400) {
+      return collapsed.slice(0, 400);
+    }
+    return collapsed;
+  }
+
+  function sanitizeString(value, maxLength) {
+    if (value === undefined || value === null) {
+      return '';
+    }
+    var str = String(value);
+    if (!maxLength) {
+      return str;
+    }
+    if (str.length > maxLength) {
+      return str.slice(0, maxLength);
+    }
+    return str;
+  }
+
+  function firstDefined() {
+    for (var i = 0; i < arguments.length; i++) {
+      var candidate = arguments[i];
+      if (candidate !== undefined && candidate !== null && candidate !== '') {
+        return candidate;
+      }
+    }
+    return undefined;
+  }
+
+  function clonePlainObject(value) {
+    if (!value || typeof value !== 'object') {
+      return {};
+    }
+
+    var clone = {};
+    for (var key in value) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) {
+        clone[key] = value[key];
+      }
+    }
+    return clone;
+  }
+
+  function clamp(value, min, max) {
+    if (typeof value !== 'number' || isNaN(value)) {
+      return min;
+    }
+    if (value < min) {
+      return min;
+    }
+    if (value > max) {
+      return max;
+    }
+    return value;
   }
 
   return {
