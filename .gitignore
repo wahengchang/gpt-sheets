@@ -1,0 +1,23 @@
+# Logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Dependency directories
+node_modules/
+
+# clasp configs with real Script IDs
+.clasp.json
+
+# Local environment files
+.env
+.env.*
+
+# macOS
+.DS_Store
+
+# Compressed archives
+*.zip
+
+docs/*

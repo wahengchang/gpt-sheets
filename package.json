@@ -1,0 +1,14 @@
+{
+  "name": "gpt-sheets",
+  "version": "0.1.0",
+  "description": "Google Sheets add-on that exposes an instantly recognizable =GPT() custom function.",
+  "private": true,
+  "scripts": {
+    "clasp:login": "clasp login",
+    "clasp:push": "clasp push",
+    "clasp:pull": "clasp pull",
+    "lint": "echo \"No lint configuration yet\""
+  },
+  "devDependencies": {},
+  "dependencies": {}
+}
