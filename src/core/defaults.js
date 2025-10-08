@@ -8,7 +8,7 @@ var DefaultsResolver = (function() {
     max_tokens: 512,
     temperature: 0.3,
     system_message: '',
-    tool: '',
+    tool: null,
     default_inferred_count: 10,
     hard_count_cap: 200,
     strict: false
@@ -150,17 +150,182 @@ var DefaultsResolver = (function() {
   }
 
   function normalizeTool(tool) {
-    if (!tool) {
-      return '';
+    if (tool === undefined || tool === null || tool === '') {
+      return null;
     }
-    var trimmed = String(tool).trim().toLowerCase();
-    if (!trimmed || trimmed === 'none') {
-      return '';
+
+    var parsed = parseToolValue(tool);
+    if (!parsed) {
+      return null;
     }
-    if (trimmed === 'web_search') {
-      return 'web_search';
+
+    if (typeof parsed === 'string') {
+      var lowered = parsed.trim().toLowerCase();
+      if (!lowered || lowered === 'none') {
+        return null;
+      }
+      if (lowered === 'web_search') {
+        return {
+          name: 'web_search',
+          parameters: {}
+        };
+      }
+      throw new Error('#GPT_TOOL_UNKNOWN Unsupported tool: ' + parsed);
     }
-    throw new Error('#GPT_TOOL_UNKNOWN Unsupported tool: ' + tool);
+
+    if (typeof parsed === 'object') {
+      var nameCandidate = parsed.name || parsed.type || parsed.tool;
+      if (nameCandidate === undefined || nameCandidate === null || nameCandidate === '') {
+        throw new Error('#GPT_TOOL_BAD_SPEC Tool specification is missing a name.');
+      }
+
+      var normalizedName = String(nameCandidate).trim().toLowerCase();
+      if (!normalizedName || normalizedName === 'none') {
+        return null;
+      }
+
+      if (normalizedName === 'web_search') {
+        return {
+          name: 'web_search',
+          parameters: extractToolParameters(parsed, 'web_search')
+        };
+      }
+
+      throw new Error('#GPT_TOOL_UNKNOWN Unsupported tool: ' + nameCandidate);
+    }
+
+    throw new Error('#GPT_TOOL_BAD_SPEC Unrecognized tool specification.');
+  }
+
+  function parseToolValue(tool) {
+    if (tool === undefined || tool === null) {
+      return null;
+    }
+
+    if (typeof tool === 'string') {
+      var trimmed = tool.trim();
+      if (!trimmed) {
+        return null;
+      }
+      if (trimmed === 'none') {
+        return null;
+      }
+      var firstChar = trimmed.charAt(0);
+      if (firstChar === '{' || firstChar === '[') {
+        try {
+          return JSON.parse(trimmed);
+        } catch (err) {
+          throw new Error('#GPT_TOOL_BAD_SPEC Unable to parse tool specification: ' + err.message);
+        }
+      }
+      return trimmed;
+    }
+
+    if (typeof tool === 'object') {
+      return tool;
+    }
+
+    return String(tool);
+  }
+
+  function extractToolParameters(spec, toolName) {
+    var merged = {};
+    if (!spec || typeof spec !== 'object') {
+      return merged;
+    }
+
+    var sources = [spec.parameters, spec.args, spec.arguments];
+    if (toolName === 'web_search') {
+      sources.push(spec.web_search);
+    }
+
+    for (var i = 0; i < sources.length; i++) {
+      merged = mergePlainObject(merged, sources[i]);
+    }
+
+    for (var key in spec) {
+      if (!Object.prototype.hasOwnProperty.call(spec, key)) {
+        continue;
+      }
+      if (
+        key === 'name' ||
+        key === 'type' ||
+        key === 'tool' ||
+        key === 'parameters' ||
+        key === 'args' ||
+        key === 'arguments' ||
+        key === 'web_search'
+      ) {
+        continue;
+      }
+      merged[key] = spec[key];
+    }
+
+    return sanitizePlainObject(merged);
+  }
+
+  function mergePlainObject(target, source) {
+    if (!source || typeof source !== 'object') {
+      return target;
+    }
+
+    var result = {};
+    for (var key in target) {
+      if (Object.prototype.hasOwnProperty.call(target, key)) {
+        result[key] = target[key];
+      }
+    }
+
+    for (var sourceKey in source) {
+      if (Object.prototype.hasOwnProperty.call(source, sourceKey)) {
+        result[sourceKey] = source[sourceKey];
+      }
+    }
+
+    return result;
+  }
+
+  function sanitizePlainObject(candidate, depth) {
+    if (!candidate || typeof candidate !== 'object') {
+      return {};
+    }
+
+    var currentDepth = typeof depth === 'number' ? depth : 0;
+    if (currentDepth > 3) {
+      return {};
+    }
+
+    var sanitized = {};
+    for (var key in candidate) {
+      if (!Object.prototype.hasOwnProperty.call(candidate, key)) {
+        continue;
+      }
+      var value = candidate[key];
+      if (value === undefined) {
+        continue;
+      }
+      if (value === null || typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+        sanitized[key] = value;
+        continue;
+      }
+      if (Array.isArray(value)) {
+        sanitized[key] = value
+          .filter(function(item) {
+            return (
+              item === null ||
+              typeof item === 'string' ||
+              typeof item === 'number' ||
+              typeof item === 'boolean'
+            );
+          })
+          .slice(0, 10);
+        continue;
+      }
+      if (typeof value === 'object') {
+        sanitized[key] = sanitizePlainObject(value, currentDepth + 1);
+      }
+    }
+    return sanitized;
   }
 
   return {
