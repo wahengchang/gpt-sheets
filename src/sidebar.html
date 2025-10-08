@@ -45,6 +45,9 @@
         font-size: 12px;
         margin-top: 4px;
       }
+      .hidden {
+        display: none !important;
+      }
       .status {
         margin-top: 12px;
         padding: 10px;
@@ -66,6 +69,43 @@
         gap: 8px;
         margin-top: 16px;
       }
+      .settings-section {
+        margin-bottom: 24px;
+        padding: 16px;
+        border-radius: 8px;
+        background: #f8f9fa;
+      }
+      .settings-section h2 {
+        margin: 0 0 12px;
+        font-size: 15px;
+      }
+      .section-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 12px;
+      }
+      #apiKeyPrimaryActions {
+        margin-top: 16px;
+      }
+      .saved-key {
+        display: none;
+        flex-direction: column;
+        gap: 12px;
+        margin-top: 16px;
+        padding: 16px;
+        border-radius: 4px;
+        background: #e8f0fe;
+        color: #202124;
+        font-size: 12px;
+      }
+      .saved-key strong {
+        display: block;
+        font-size: 13px;
+      }
+      .saved-key .section-actions {
+        margin-top: 0;
+        justify-content: flex-start;
+      }
       button {
         border: none;
         padding: 10px 14px;
@@ -82,79 +122,142 @@
         color: #202124;
       }
       button.danger {
-        background: transparent;
-        color: #c5221f;
-        padding-left: 0;
+        background: #fce8e6;
+        color: #a50e0e;
       }
       button:disabled {
         opacity: 0.6;
         cursor: not-allowed;
       }
+      .divider {
+        border: none;
+        border-top: 1px solid #dadce0;
+        margin: 24px 0;
+      }
+      .temperature-inputs {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .temperature-inputs input[type="range"] {
+        flex: 1;
+      }
+      .temperature-inputs input[type="number"] {
+        width: 80px;
+      }
+      .footer-actions {
+        justify-content: flex-end;
+      }
     </style>
   </head>
   <body>
     <h1>GPT for Sheets Settings</h1>
-    <div class="field">
-      <label for="apiKey">OpenAI API Key</label>
-      <input
-        type="password"
-        id="apiKey"
-        name="apiKey"
-        autocomplete="off"
-        placeholder="sk-..."
-      />
-      <div id="apiKeyHint" class="hint"></div>
-      <button type="button" class="danger" id="clearKeyButton" style="display:none;">Remove saved key</button>
-    </div>
 
-    <div class="field">
-      <label for="model">Model</label>
-      <input type="text" id="model" name="model" placeholder="gpt-4.1-mini" />
+    <section class="settings-section" id="apiKeySection">
+      <h2>OpenAI API Key</h2>
+      <p class="hint">Stored per Google account. Only one key can be active at a time.</p>
+      <div class="field" id="apiKeyFieldContainer">
+        <label for="apiKey">OpenAI API Key</label>
+        <input
+          type="password"
+          id="apiKey"
+          name="apiKey"
+          autocomplete="off"
+          placeholder="sk-..."
+        />
+      </div>
+      <div id="apiKeyHint" class="hint">Paste your OpenAI key (sk-...). Stored securely for your account only.</div>
+      <div class="section-actions" id="apiKeyPrimaryActions">
+        <button type="button" class="primary" id="saveKeyButton">Save</button>
+      </div>
+      <div class="saved-key" id="savedKeyInfo">
+        <div>
+          <strong>Saved key</strong>
+          <div id="savedKeyPreview"></div>
+          <div class="hint">Remove it to connect a different key.</div>
+        </div>
+        <div class="section-actions" id="savedKeyActions">
+          <button type="button" class="secondary" id="testButton">Test Key</button>
+          <button type="button" class="danger" id="clearKeyButton">Remove</button>
+        </div>
+      </div>
+      <div id="apiKeyStatus" class="status"></div>
+    </section>
+
+    <hr class="divider" />
+
+    <section class="settings-section">
+      <h2>Model</h2>
+      <div class="field">
+        <label for="model">Model</label>
+        <input type="text" id="model" name="model" placeholder="gpt-4.1-mini" />
+      </div>
       <div class="hint">Choose any chat-capable OpenAI model available to your account.</div>
-    </div>
+    </section>
 
-    <div class="field">
-      <label for="temperature">Temperature</label>
-      <input
-        type="number"
-        id="temperature"
-        name="temperature"
-        step="0.1"
-        min="0"
-        max="2"
-      />
-      <div class="hint">Higher values (e.g. 1.0) increase creativity; lower values (e.g. 0.2) make responses more focused.</div>
-    </div>
+    <section class="settings-section">
+      <h2>Temperature</h2>
+      <div class="field">
+        <label for="temperatureSlider">Temperature</label>
+        <div class="temperature-inputs">
+          <input
+            type="range"
+            id="temperatureSlider"
+            name="temperatureSlider"
+            min="0"
+            max="2"
+            step="0.1"
+          />
+          <input
+            type="number"
+            id="temperature"
+            name="temperature"
+            step="0.1"
+            min="0"
+            max="2"
+          />
+        </div>
+      </div>
+      <div class="hint">Higher values increase creativity; lower values keep responses focused.</div>
+    </section>
 
-    <div class="field">
-      <label for="maxTokens">Max tokens</label>
-      <input type="number" id="maxTokens" name="maxTokens" min="1" max="32768" />
-      <div class="hint">Controls response length. Stay within your model's maximum context window.</div>
-    </div>
-
-    <div class="actions">
-      <button type="button" class="primary" id="saveButton">Save</button>
-      <button type="button" class="secondary" id="testButton">Test connection</button>
-    </div>
-
-    <div id="status" class="status"></div>
+    <section class="settings-section" id="otherSettings">
+      <h2>Other Settings</h2>
+      <div class="field">
+        <label for="maxTokens">Max tokens</label>
+        <input type="number" id="maxTokens" name="maxTokens" min="1" max="32768" />
+        <div class="hint">Controls response length. Stay within your model's maximum context window.</div>
+      </div>
+      <div class="section-actions footer-actions">
+        <button type="button" class="primary" id="saveDefaultsButton">Save</button>
+        <button type="button" class="secondary" id="resetDefaultsButton">Reset</button>
+      </div>
+      <div id="defaultsStatus" class="status"></div>
+    </section>
 
     <script>
       var settingsState = {
         hasApiKey: false,
         apiKeyMasked: '',
+        apiKeyPreview: '',
         defaults: {}
       };
 
-      document.getElementById('saveButton').addEventListener('click', handleSave);
+      document.getElementById('saveKeyButton').addEventListener('click', handleSaveKey);
       document.getElementById('testButton').addEventListener('click', handleTest);
       document.getElementById('clearKeyButton').addEventListener('click', handleClearKey);
+      document.getElementById('saveDefaultsButton').addEventListener('click', handleSaveDefaults);
+      document.getElementById('resetDefaultsButton').addEventListener('click', resetDefaultsForm);
+      document.getElementById('temperatureSlider').addEventListener('input', syncTemperatureFromSlider);
+      document.getElementById('temperature').addEventListener('input', syncTemperatureFromInput);
 
       document.addEventListener('DOMContentLoaded', function() {
         google.script.run
           .withSuccessHandler(renderSettings)
           .withFailureHandler(function(error) {
-            showStatus(error && error.message ? error.message : 'Failed to load settings.', true);
+            var message = error && error.message ? error.message : 'Failed to load settings.';
+            showStatus('apiKeyStatus', message, true);
+            showStatus('defaultsStatus', message, true);
           })
           .getSettings();
       });
@@ -162,36 +265,68 @@
       function renderSettings(data) {
         settingsState = data;
         settingsState.clearKeyRequested = false;
+        settingsState.apiKeyPreview = data.apiKeyPreview || '';
+
+        var apiKeyField = document.getElementById('apiKey');
+        var apiKeyHint = document.getElementById('apiKeyHint');
+        var apiKeyFieldContainer = document.getElementById('apiKeyFieldContainer');
+        var apiKeyPrimaryActions = document.getElementById('apiKeyPrimaryActions');
+        var savedKeyInfo = document.getElementById('savedKeyInfo');
+        var savedKeyPreview = document.getElementById('savedKeyPreview');
         var modelInput = document.getElementById('model');
         var temperatureInput = document.getElementById('temperature');
+        var temperatureSlider = document.getElementById('temperatureSlider');
         var maxTokensInput = document.getElementById('maxTokens');
-        var apiKeyHint = document.getElementById('apiKeyHint');
-        var clearKeyButton = document.getElementById('clearKeyButton');
 
-        modelInput.value = data.model || data.defaults.model;
-        temperatureInput.value = data.temperature || data.defaults.temperature;
-        maxTokensInput.value = data.maxTokens || data.defaults.maxTokens;
+        var modelValue = data.model || data.defaults.model || '';
+        var temperatureValue = parseFloat(
+          data.temperature !== undefined && data.temperature !== null && data.temperature !== ''
+            ? data.temperature
+            : data.defaults.temperature
+        );
+        if (isNaN(temperatureValue)) {
+          temperatureValue = 0;
+        }
+        var maxTokensValue = data.maxTokens || data.defaults.maxTokens || '';
 
-        if (data.hasApiKey) {
-          apiKeyHint.textContent = 'API key saved: ' + data.apiKeyMasked + '. Leave blank to keep it.';
-          clearKeyButton.style.display = 'inline';
+        modelInput.value = modelValue;
+        temperatureInput.value = temperatureValue;
+        temperatureSlider.value = temperatureValue;
+        maxTokensInput.value = maxTokensValue;
+
+        if (data.hasApiKey && !settingsState.clearKeyRequested) {
+          settingsState.hasApiKey = true;
+          apiKeyField.value = '';
+          apiKeyFieldContainer.classList.add('hidden');
+          apiKeyHint.classList.add('hidden');
+          savedKeyPreview.textContent = data.apiKeyPreview || '';
+          savedKeyInfo.style.display = 'flex';
+          apiKeyPrimaryActions.style.display = 'none';
         } else {
+          settingsState.hasApiKey = false;
+          apiKeyField.type = 'password';
+          apiKeyField.value = '';
+          apiKeyField.placeholder = 'sk-...';
+          apiKeyFieldContainer.classList.remove('hidden');
+          apiKeyHint.classList.remove('hidden');
           apiKeyHint.textContent = 'Paste your OpenAI key (sk-...). Stored securely for your account only.';
-          clearKeyButton.style.display = 'none';
+          savedKeyInfo.style.display = 'none';
+          savedKeyPreview.textContent = '';
+          apiKeyPrimaryActions.style.display = 'flex';
         }
       }
 
-      function handleSave() {
-        toggleButtons(true);
-        showStatus('');
-
+      function handleSaveKey() {
+        toggleKeyButtons(true);
+        showStatus('apiKeyStatus', '');
         var apiKeyField = document.getElementById('apiKey');
         var payload = {
           apiKey: apiKeyField.value.trim(),
           model: document.getElementById('model').value.trim(),
           temperature: document.getElementById('temperature').value,
           maxTokens: document.getElementById('maxTokens').value,
-          retainExistingKey: settingsState.hasApiKey && !apiKeyField.value && !settingsState.clearKeyRequested
+          retainExistingKey: settingsState.hasApiKey && !apiKeyField.value && !settingsState.clearKeyRequested,
+          saveDefaultsOnly: false
         };
 
         if (settingsState.clearKeyRequested) {
@@ -201,59 +336,128 @@
 
         google.script.run
           .withSuccessHandler(function(response) {
-            showStatus(response && response.message ? response.message : 'Settings saved.', false);
+            showStatus('apiKeyStatus', response && response.message ? response.message : 'Key saved.', false);
             apiKeyField.value = '';
             settingsState.clearKeyRequested = false;
+            if (response && response.apiKeyPreview) {
+              settingsState.apiKeyPreview = response.apiKeyPreview;
+              settingsState.hasApiKey = true;
+            } else {
+              settingsState.apiKeyPreview = '';
+              settingsState.hasApiKey = false;
+            }
             refreshSettings();
-            toggleButtons(false);
+            toggleKeyButtons(false);
           })
           .withFailureHandler(function(error) {
-            showStatus(error && error.message ? error.message : 'Unable to save settings.', true);
-            toggleButtons(false);
+            showStatus('apiKeyStatus', error && error.message ? error.message : 'Unable to save key.', true);
+            toggleKeyButtons(false);
           })
           .saveSettings(payload);
       }
 
+      function handleSaveDefaults() {
+        toggleDefaultButtons(true);
+        showStatus('defaultsStatus', '');
+
+        var payload = {
+          model: document.getElementById('model').value.trim(),
+          temperature: document.getElementById('temperature').value,
+          maxTokens: document.getElementById('maxTokens').value,
+          retainExistingKey: true,
+          saveDefaultsOnly: true
+        };
+
+        google.script.run
+          .withSuccessHandler(function(response) {
+            showStatus('defaultsStatus', response && response.message ? response.message : 'Defaults saved.', false);
+            toggleDefaultButtons(false);
+            refreshSettings();
+          })
+          .withFailureHandler(function(error) {
+            showStatus('defaultsStatus', error && error.message ? error.message : 'Unable to save defaults.', true);
+            toggleDefaultButtons(false);
+          })
+          .saveSettings(payload);
+      }
+
+      function resetDefaultsForm() {
+        var defaults = settingsState.defaults || {};
+        var modelDefault = defaults.model || '';
+        var temperatureDefault = parseFloat(
+          defaults.temperature !== undefined && defaults.temperature !== null ? defaults.temperature : 0
+        );
+        if (isNaN(temperatureDefault)) {
+          temperatureDefault = 0;
+        }
+        var maxTokensDefault = defaults.maxTokens || '';
+
+        document.getElementById('model').value = modelDefault;
+        document.getElementById('temperature').value = temperatureDefault;
+        document.getElementById('temperatureSlider').value = temperatureDefault;
+        document.getElementById('maxTokens').value = maxTokensDefault;
+        showStatus('defaultsStatus', 'Defaults reset to recommended values.', false);
+      }
+
       function handleTest() {
-        toggleButtons(true);
-        showStatus('Testing connection...');
+        toggleKeyButtons(true);
+        showStatus('apiKeyStatus', 'Testing key...', false);
 
         var apiKeyField = document.getElementById('apiKey');
-        var candidateKey = apiKeyField.value.trim();
+        var candidateKey = settingsState.hasApiKey ? '' : apiKeyField.value.trim();
 
         google.script.run
           .withSuccessHandler(function(result) {
             if (result && typeof result.success === 'boolean') {
-              showStatus(result.message, !result.success);
+              showStatus('apiKeyStatus', result.message, !result.success);
             } else {
-              showStatus('Test completed.', false);
+              showStatus('apiKeyStatus', 'Test completed.', false);
             }
-            toggleButtons(false);
+            toggleKeyButtons(false);
           })
           .withFailureHandler(function(error) {
-            showStatus(error && error.message ? error.message : 'Unable to test connection.', true);
-            toggleButtons(false);
+            showStatus('apiKeyStatus', error && error.message ? error.message : 'Unable to test connection.', true);
+            toggleKeyButtons(false);
           })
           .testConnection({ apiKey: candidateKey });
       }
 
       function handleClearKey() {
+        if (!confirm('Remove the stored OpenAI API key for this account?')) {
+          return;
+        }
         settingsState.clearKeyRequested = true;
-        document.getElementById('apiKey').value = '';
-        showStatus('API key will be removed once you save.', false);
+        settingsState.hasApiKey = false;
+        var apiKeyField = document.getElementById('apiKey');
+        apiKeyField.disabled = false;
+        apiKeyField.type = 'password';
+        apiKeyField.value = '';
+        apiKeyField.placeholder = 'sk-...';
+        document.getElementById('apiKeyFieldContainer').classList.remove('hidden');
+        document.getElementById('apiKeyHint').classList.remove('hidden');
+        document.getElementById('savedKeyInfo').style.display = 'none';
+        document.getElementById('savedKeyPreview').textContent = '';
+        document.getElementById('apiKeyPrimaryActions').style.display = 'flex';
+        document.getElementById('apiKeyHint').textContent = 'Paste your OpenAI key (sk-...). Stored securely for your account only.';
+        showStatus('apiKeyStatus', 'API key will be removed once you save.', false);
       }
 
       function refreshSettings() {
         google.script.run
           .withSuccessHandler(renderSettings)
           .withFailureHandler(function(error) {
-            showStatus(error && error.message ? error.message : 'Failed to refresh settings.', true);
+            var message = error && error.message ? error.message : 'Failed to refresh settings.';
+            showStatus('apiKeyStatus', message, true);
+            showStatus('defaultsStatus', message, true);
           })
           .getSettings();
       }
 
-      function showStatus(message, isError) {
-        var statusBox = document.getElementById('status');
+      function showStatus(targetId, message, isError) {
+        var statusBox = document.getElementById(targetId);
+        if (!statusBox) {
+          return;
+        }
         if (!message) {
           statusBox.style.display = 'none';
           statusBox.textContent = '';
@@ -266,11 +470,42 @@
         statusBox.classList.toggle('success', !isError);
       }
 
-      function toggleButtons(disabled) {
-        document.getElementById('saveButton').disabled = disabled;
+      function toggleKeyButtons(disabled) {
+        document.getElementById('saveKeyButton').disabled = disabled;
         document.getElementById('testButton').disabled = disabled;
-        var clearButton = document.getElementById('clearKeyButton');
-        clearButton.disabled = disabled;
+        document.getElementById('clearKeyButton').disabled = disabled;
+      }
+
+      function toggleDefaultButtons(disabled) {
+        document.getElementById('saveDefaultsButton').disabled = disabled;
+        document.getElementById('resetDefaultsButton').disabled = disabled;
+      }
+
+      function syncTemperatureFromSlider() {
+        var slider = document.getElementById('temperatureSlider');
+        document.getElementById('temperature').value = slider.value;
+      }
+
+      function syncTemperatureFromInput() {
+        var input = document.getElementById('temperature');
+        var slider = document.getElementById('temperatureSlider');
+        if (input.value === '') {
+          return;
+        }
+        var numericValue = parseFloat(input.value);
+        if (isNaN(numericValue)) {
+          return;
+        }
+        var min = parseFloat(slider.min);
+        var max = parseFloat(slider.max);
+        if (!isNaN(min)) {
+          numericValue = Math.max(numericValue, min);
+        }
+        if (!isNaN(max)) {
+          numericValue = Math.min(numericValue, max);
+        }
+        slider.value = numericValue;
+        input.value = numericValue;
       }
     </script>
   </body>

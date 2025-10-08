@@ -30,6 +30,7 @@ function getSettings() {
   return {
     hasApiKey: hasApiKey,
     apiKeyMasked: masked,
+    apiKeyPreview: hasApiKey ? formatKeyPreview(apiKey) : '',
     model: model,
     temperature: parseFloat(temperatureRaw || defaults.temperature),
     maxTokens: parseInt(maxTokensRaw || defaults.maxTokens, 10),
@@ -50,21 +51,26 @@ function saveSettings(payload) {
 
   var userProps = PropertiesService.getUserProperties();
   var docProps = PropertiesService.getDocumentProperties();
+  var existingKey = userProps.getProperty(USER_API_KEY_PROPERTY) || '';
   var trimmedKey = (payload.apiKey || '').trim();
   var retainsExistingKey = Boolean(payload.retainExistingKey);
   var hasExistingKey = Boolean(userProps.getProperty(USER_API_KEY_PROPERTY));
 
   if (trimmedKey && !isValidApiKeyFormat(trimmedKey)) {
-    throw new Error('Enter a valid OpenAI API key (starts with "sk-").');
+    throw new Error('Enter a valid OpenAI API key (starts with "sk-"). Received: ' + formatKeyPreview(trimmedKey));
   }
 
-  if (trimmedKey) {
-    userProps.setProperty(USER_API_KEY_PROPERTY, trimmedKey);
-  } else if (!retainsExistingKey) {
-    // User cleared the key intentionally.
-    userProps.deleteProperty(USER_API_KEY_PROPERTY);
-  } else if (!hasExistingKey && !trimmedKey) {
-    throw new Error('Add your OpenAI API key before saving.');
+  if (typeof payload.saveDefaultsOnly === 'boolean' && payload.saveDefaultsOnly) {
+    // Skip key handling; only update defaults.
+  } else {
+    if (trimmedKey) {
+      userProps.setProperty(USER_API_KEY_PROPERTY, trimmedKey);
+    } else if (!retainsExistingKey) {
+      // User cleared the key intentionally.
+      userProps.deleteProperty(USER_API_KEY_PROPERTY);
+    } else if (!hasExistingKey && !trimmedKey) {
+      throw new Error('Add your OpenAI API key before saving.');
+    }
   }
 
   var defaults = getSettingsDefaults();
@@ -80,7 +86,11 @@ function saveSettings(payload) {
   docProps.setProperty(DOC_TEMPERATURE_PROPERTY, String(temperature));
   docProps.setProperty(DOC_MAX_TOKENS_PROPERTY, String(maxTokens));
 
-  return { message: 'Settings saved successfully.' };
+  var effectiveKey = trimmedKey || (retainsExistingKey ? existingKey : '');
+  return {
+    message: payload.saveDefaultsOnly ? 'Defaults saved successfully.' : 'Settings saved successfully.',
+    apiKeyPreview: effectiveKey ? formatKeyPreview(effectiveKey) : ''
+  };
 }
 
 /**
@@ -96,7 +106,7 @@ function testConnection(payload) {
   if (!keyToTest) {
     return {
       success: false,
-      message: 'Add your OpenAI API key before testing.'
+      message: 'Save your OpenAI API key before testing.'
     };
   }
 
@@ -113,7 +123,7 @@ function testConnection(payload) {
     if (code >= 200 && code < 300) {
       return {
         success: true,
-        message: 'API key is valid.'
+        message: 'API key is valid (' + formatKeyPreview(keyToTest) + ').'
       };
     }
 
@@ -180,11 +190,30 @@ function maskApiKey(key) {
     return '';
   }
 
-  var visibleSuffix = key.slice(-4);
-  var maskedLength = Math.max(0, key.length - 4);
-  return new Array(maskedLength + 1).join('*') + visibleSuffix;
+  if (key.length <= 10) {
+    return key;
+  }
+
+  var start = key.slice(0, 5);
+  var end = key.slice(-5);
+  var maskedLength = Math.max(0, key.length - 10);
+  return start + new Array(maskedLength + 1).join('*') + end;
 }
 
 function isValidApiKeyFormat(key) {
-  return /^sk-[A-Za-z0-9]{20,}$/.test(key);
+  return /^sk-[A-Za-z0-9-_]{20,}$/.test(key);
+}
+
+function formatKeyPreview(key) {
+  if (!key) {
+    return '';
+  }
+
+  if (key.length <= 10) {
+    return key;
+  }
+
+  var start = key.slice(0, 5);
+  var end = key.slice(-5);
+  return start + '...' + end;
 }
