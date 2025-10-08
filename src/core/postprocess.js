@@ -57,15 +57,19 @@ var PostProcessor = (function() {
       return [['(no data)']];
     }
 
-    var rows = [];
     var fields = (schema && schema.fields) || [];
+    if (!fields.length) {
+      return [['(no data)']];
+    }
+
+    var row = [];
     for (var i = 0; i < fields.length; i++) {
       var field = fields[i];
       var coerced = coerceField(record[field.key], field.type);
-      rows.push([formatCoercedValue(coerced, field.type)]);
+      row.push(formatCoercedValue(coerced, field.type));
     }
 
-    return rows.length ? rows : [['(no data)']];
+    return [row];
   }
 
   function wrapRecordList(records, schema, targetCount, cfg) {
