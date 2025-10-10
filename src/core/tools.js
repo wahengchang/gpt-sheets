@@ -34,11 +34,12 @@ var ToolRunner = (function() {
     var queryForContext = sanitized.search_query || '';
 
     return {
-      contextText: buildWebSearchContext(text, queryForContext),
+      contextText: buildWebSearchContext(text, queryForContext, sanitized),
       diagnostics: {
         tool_used: 'web_search',
         tool_mode: 'openai',
-        tool_query: queryForContext
+        tool_query: queryForContext,
+        tool_parameters: JSON.stringify(sanitized)
       },
       toolSpec: {
         name: 'web_search',
@@ -105,18 +106,28 @@ var ToolRunner = (function() {
     return normalized;
   }
 
-  function buildWebSearchContext(promptText, query) {
+  function buildWebSearchContext(promptText, query, parameters) {
     var sanitizedPrompt = sanitizeString(promptText, 300);
     var sanitizedQuery = sanitizeString(query, 200);
     if (!sanitizedPrompt && sanitizedQuery) {
       sanitizedPrompt = sanitizedQuery;
     }
-    return (
-      'A live web search has been requested for real-time data. Query: "' +
-      sanitizedQuery +
-      '". If the web search tool is unavailable, rely on your general knowledge to answer the prompt: ' +
-      sanitizedPrompt
+    var contextParts = [
+      'A live web search has been requested for real-time data.',
+      'Query: "' + sanitizedQuery + '".'
+    ];
+
+    var parameterSummary = summarizeWebSearchParameters(parameters);
+    if (parameterSummary) {
+      contextParts.push('Preferences: ' + parameterSummary + '.');
+    }
+
+    contextParts.push(
+      'If the web search tool is unavailable, rely on your general knowledge to answer the prompt: ' +
+        sanitizedPrompt
     );
+
+    return contextParts.join(' ');
   }
 
   function buildFallbackContext(promptText) {
@@ -167,6 +178,47 @@ var ToolRunner = (function() {
       return str.slice(0, maxLength);
     }
     return str;
+  }
+
+  function summarizeWebSearchParameters(parameters) {
+    if (!parameters || typeof parameters !== 'object') {
+      return '';
+    }
+
+    var parts = [];
+
+    if (parameters.max_results !== undefined) {
+      parts.push('max results ' + parameters.max_results);
+    }
+
+    if (parameters.recency_filter) {
+      parts.push('recency filter ' + sanitizeString(parameters.recency_filter, 60));
+    }
+
+    if (parameters.include_images !== undefined) {
+      parts.push(parameters.include_images ? 'include images' : 'text-only results');
+    }
+
+    for (var key in parameters) {
+      if (!Object.prototype.hasOwnProperty.call(parameters, key)) {
+        continue;
+      }
+      if (
+        key === 'search_query' ||
+        key === 'max_results' ||
+        key === 'recency_filter' ||
+        key === 'include_images'
+      ) {
+        continue;
+      }
+      var value = parameters[key];
+      if (value === undefined || value === null || value === '') {
+        continue;
+      }
+      parts.push(key + ': ' + sanitizeString(value, 60));
+    }
+
+    return parts.join(', ');
   }
 
   function firstDefined() {
