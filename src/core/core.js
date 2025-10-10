@@ -37,7 +37,8 @@ var Core = (function() {
       model: resolved.model,
       messages: prompt.messages,
       temperature: resolved.temperature,
-      max_tokens: resolved.max_tokens
+      max_tokens: resolved.max_tokens,
+      tool: toolResult && toolResult.toolSpec
     });
 
     var shaped = Shaper.apply({
